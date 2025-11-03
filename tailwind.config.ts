@@ -80,10 +80,20 @@ export default {
             height: "0",
           },
         },
+        float: {
+          "0%, 100%": { transform: "translateY(0)" },
+          "50%": { transform: "translateY(-10px)" },
+        },
+        "shine": {
+          "0%": { backgroundPosition: "200%" },
+          "100%": { backgroundPosition: "-200%" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        float: "float 3s ease-in-out infinite",
+        shine: "shine 3s linear infinite",
       },
     },
   },

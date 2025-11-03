@@ -1,0 +1,4 @@
+project_id = "wegfpdzgtldvnkjtjisp"
+
+[functions.submit-admission]
+verify_jwt = false

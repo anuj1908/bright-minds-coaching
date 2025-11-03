@@ -10,6 +10,7 @@ import admissionImage from "@/assets/admission-hero.jpg";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { CheckCircle2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 
 const Admission = () => {
   const { toast } = useToast();
@@ -22,8 +23,10 @@ const Admission = () => {
     address: "",
     subjects: "",
   });
+  const [googleSheetUrl, setGoogleSheetUrl] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     // Basic validation
@@ -36,21 +39,52 @@ const Admission = () => {
       return;
     }
 
-    toast({
-      title: "Application Submitted Successfully! 🎉",
-      description: "We will contact you soon with further details.",
-    });
+    if (!googleSheetUrl) {
+      toast({
+        title: "Google Sheet URL Required",
+        description: "Please enter your Google Sheet webhook URL.",
+        variant: "destructive",
+      });
+      return;
+    }
 
-    // Reset form
-    setFormData({
-      fullName: "",
-      class: "",
-      board: "",
-      contactNumber: "",
-      email: "",
-      address: "",
-      subjects: "",
-    });
+    setIsSubmitting(true);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('submit-admission', {
+        body: {
+          ...formData,
+          googleSheetUrl,
+        },
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: "Application Submitted Successfully! 🎉",
+        description: "Your admission form has been saved to Google Sheets.",
+      });
+
+      // Reset form
+      setFormData({
+        fullName: "",
+        class: "",
+        board: "",
+        contactNumber: "",
+        email: "",
+        address: "",
+        subjects: "",
+      });
+    } catch (error: any) {
+      console.error("Error submitting form:", error);
+      toast({
+        title: "Submission Failed",
+        description: error.message || "Failed to submit form. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const features = [
@@ -138,6 +172,20 @@ const Admission = () => {
                   <h2 className="text-3xl font-bold text-foreground mb-6">Admission Form</h2>
                   
                   <form onSubmit={handleSubmit} className="space-y-6">
+                    <div className="p-4 bg-muted rounded-lg">
+                      <Label htmlFor="googleSheetUrl">Google Sheet Webhook URL *</Label>
+                      <Input
+                        id="googleSheetUrl"
+                        value={googleSheetUrl}
+                        onChange={(e) => setGoogleSheetUrl(e.target.value)}
+                        placeholder="Enter your Google Apps Script webhook URL"
+                        required
+                        className="mt-2"
+                      />
+                      <p className="text-xs text-muted-foreground mt-2">
+                        Need help? Follow the setup instructions below the form.
+                      </p>
+                    </div>
                     <div>
                       <Label htmlFor="fullName">Full Name *</Label>
                       <Input
@@ -226,13 +274,69 @@ const Admission = () => {
                       />
                     </div>
 
-                    <Button type="submit" className="w-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-medium" size="lg">
-                      Submit & Join Us
+                    <Button 
+                      type="submit" 
+                      disabled={isSubmitting}
+                      className="w-full bg-primary hover:bg-primary/90 text-primary-foreground shadow-medium" 
+                      size="lg"
+                    >
+                      {isSubmitting ? "Submitting..." : "Submit & Join Us"}
                     </Button>
                   </form>
                 </Card>
               </div>
             </div>
+
+            {/* Setup Instructions */}
+            <Card className="p-8 mt-12 shadow-medium">
+              <h3 className="text-2xl font-bold text-foreground mb-4">📋 How to Set Up Google Sheets Integration</h3>
+              <div className="space-y-4 text-muted-foreground">
+                <div>
+                  <p className="font-semibold text-foreground mb-2">Step 1: Create a Google Sheet</p>
+                  <p>Create a new Google Sheet with columns: Timestamp, Full Name, Class, Board, Contact Number, Email, Address, Subjects</p>
+                </div>
+                
+                <div>
+                  <p className="font-semibold text-foreground mb-2">Step 2: Open Apps Script</p>
+                  <p>In your Google Sheet, go to Extensions → Apps Script</p>
+                </div>
+                
+                <div>
+                  <p className="font-semibold text-foreground mb-2">Step 3: Paste This Code</p>
+                  <pre className="bg-muted p-4 rounded-lg overflow-x-auto text-xs">
+{`function doPost(e) {
+  var sheet = SpreadsheetApp.getActiveSheet();
+  var data = JSON.parse(e.postData.contents);
+  
+  sheet.appendRow([
+    data.timestamp,
+    data.fullName,
+    data.class,
+    data.board,
+    data.contactNumber,
+    data.email,
+    data.address,
+    data.subjects
+  ]);
+  
+  return ContentService.createTextOutput(
+    JSON.stringify({success: true})
+  ).setMimeType(ContentService.MimeType.JSON);
+}`}
+                  </pre>
+                </div>
+                
+                <div>
+                  <p className="font-semibold text-foreground mb-2">Step 4: Deploy as Web App</p>
+                  <p>Click Deploy → New deployment → Select "Web app" → Set "Who has access" to "Anyone" → Click Deploy</p>
+                </div>
+                
+                <div>
+                  <p className="font-semibold text-foreground mb-2">Step 5: Copy the URL</p>
+                  <p>Copy the web app URL and paste it in the form above</p>
+                </div>
+              </div>
+            </Card>
           </div>
         </div>
       </section>
